@@ -20,7 +20,8 @@ import (
 	"google.golang.org/grpc/peer"
 
 	grpc_auth "github.com/grpc-ecosystem/go-grpc-middleware/auth"
-	"github.com/pantheon-systems/go-certauth/certutils"
+	"github.com/pantheon-systems/certinel"
+	"github.com/pantheon-systems/certinel/pollwatcher"
 	"github.com/pantheon-systems/riker/pkg/botpb"
 	"github.com/pantheon-systems/riker/pkg/riker"
 	"github.com/pkg/errors"
@@ -175,27 +176,26 @@ func (b *SlackBot) HealthZ() error {
 }
 
 // New is the constroctor for a bot
-func New(name, bindAddr, botKey, token, tlsFile, caFile string, allowedOUs []string, log *logrus.Logger) (riker.Bot, error) {
+func New(name, bindAddr, botKey, token, tlsFile, caFile, duration string, allowedOUs []string, log *logrus.Logger) (riker.Bot, error) {
 	if log == nil {
 		log = logrus.New()
 	}
 
-	cert, err := certutils.LoadKeyCertFiles(tlsFile, tlsFile)
+	interval, err := time.ParseDuration(duration)
 	if err != nil {
-		return nil, ErrorLoadingCert{fmt.Sprintf("Could not load TLS cert '%s': %s", tlsFile, err.Error())}
+		return nil, fmt.Errorf("Could not parse duration (%s) for tls: %s", duration, err.Error())
 	}
 
-	caPool, err := certutils.LoadCACertFile(caFile)
-	if err != nil {
-		return nil, ErrorLoadingCert{fmt.Sprintf("Could not load CA cert '%s': %s", caFile, err.Error())}
+	watcher := pollwatcher.New(tlsFile, caFile, interval)
+
+	sentinel := certinel.New(watcher, nil, func(err error) {
+		fmt.Errorf("certinel was unable to reload the certificate: %s", err)
+	})
+	sentinel.Watch()
+
+	tlsConfig := &tls.Config{
+		GetCertificate: sentinel.GetCertificate,
 	}
-
-	// TODO: use CertReloader from certutils
-	tlsConfig := certutils.NewTLSConfig(certutils.TLSConfigModern)
-	tlsConfig.ClientCAs = caPool
-	tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
-	tlsConfig.Certificates = []tls.Certificate{cert}
-
 	k := keepalive.ServerParameters{
 		// After a duration of this time if the server doesn't see any activity it pings the client to see if the transport is still alive.
 		// The grpc default value is 2 hours.

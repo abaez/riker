@@ -12,7 +12,7 @@ require (
 	github.com/mattn/go-runewidth v0.0.10 // indirect
 	github.com/mitchellh/mapstructure v1.4.1 // indirect
 	github.com/nsf/termbox-go v1.1.0 // indirect
-	github.com/pantheon-systems/go-certauth v0.0.0-20170606170341-8764720d23a5
+	github.com/pantheon-systems/certinel v1.2.1
 	github.com/pelletier/go-toml v1.8.1 // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/rivo/uniseg v0.2.0 // indirect
